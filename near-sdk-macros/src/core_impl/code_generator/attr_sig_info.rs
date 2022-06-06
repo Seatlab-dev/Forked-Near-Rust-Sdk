@@ -25,10 +25,10 @@ impl AttrSigInfo {
     /// ```
     pub fn input_struct(&self, input_struct_type: InputStructType) -> TokenStream2 {
         let args: Vec<_> = self.input_args().collect();
-        assert!(
-            !args.is_empty(),
-            "Can only generate input struct for when input args are specified"
-        );
+        // assert!(
+        //     !args.is_empty(),
+        //     "Can only generate input struct for when input args are specified"
+        // );
         let attribute = match input_struct_type {
             InputStructType::Serialization => match &self.input_serializer {
                 SerializerType::JSON => quote! {
@@ -43,28 +43,116 @@ impl AttrSigInfo {
             },
             InputStructType::Deserialization => match &self.input_serializer {
                 SerializerType::JSON => quote! {
-                    #[derive(near_sdk::serde::Deserialize)]
+                    #[derive(near_sdk::serde::Serialize, near_sdk::serde::Deserialize)]
                     #[serde(crate = "near_sdk::serde")]
                 },
                 SerializerType::Borsh => {
                     quote! {
-                        #[derive(near_sdk::borsh::BorshDeserialize)]
+                        #[derive(near_sdk::borsh::BorshSerialize, near_sdk::borsh::BorshDeserialize)]
                     }
                 }
             },
         };
+        // pub a: (), pub b: (), ..
         let mut fields = TokenStream2::new();
         for arg in args {
             let ArgInfo { ty, ident, .. } = &arg;
             fields.extend(quote! {
-                #ident: #ty,
+                pub #ident: #ty,
             });
         }
         quote! {
             #attribute
-            struct Input {
+            pub struct Input {
                 #fields
             }
+        }
+    }
+
+    pub fn input_struct2(
+        &self,
+        contract_ty: &syn::Type,
+        method_type: &crate::MethodType,
+    ) -> TokenStream2 {
+        let args: Vec<_> = self.input_args().collect();
+        let fn_ident = &self.ident;
+
+        let marshall_contract = {
+            use quote::{format_ident, ToTokens};
+            let orig_name = contract_ty.clone().into_token_stream();
+            let mut name = quote! {Contract};
+            if let Ok(input) = syn::parse::<syn::Ident>(orig_name.into()) {
+                let new_name = format_ident!("{}Contract", input);
+                name = quote! {#new_name};
+            };
+            name
+        };
+
+        // a, b, ..
+        let mut field_names = TokenStream2::new();
+        // a: impl Into<()>, b: impl Into<()>, ..
+        let mut impl_into_args = TokenStream2::new();
+        // a: a.into(), b: b.into(), ..
+        let mut impl_into_fields = TokenStream2::new();
+        for arg in args {
+            let ArgInfo { ty, ident, .. } = &arg;
+            field_names.extend(quote! (#ident,));
+            impl_into_args.extend(quote! {
+                #ident: impl Into<#ty>,
+            });
+            impl_into_fields.extend(quote! {
+                #ident: #ident.into(),
+            });
+        }
+
+        let wrap_trait = if matches!(method_type, &crate::MethodType::Init) {
+            quote! {
+                pub trait WrapInput<Local>: Sized {
+                    fn #fn_ident(#impl_into_args) -> near_sdk::utils::InputWrapped<'static, std::marker::PhantomData<Self>, Input> {
+                        let input = Input::new(#field_names);
+                        near_sdk::utils::InputWrapped {
+                            inner: &std::marker::PhantomData,
+                            input
+                        }
+                    }
+                }
+            }
+        } else {
+            quote! {
+                pub trait WrapInput<Local>: Sized {
+                    fn #fn_ident(&self, #impl_into_args) -> near_sdk::utils::InputWrapped<Self, Input> {
+                        let input = Input::new(#field_names);
+                        near_sdk::utils::InputWrapped {
+                            inner: self,
+                            input
+                        }
+                    }
+                }
+            }
+        };
+
+        quote! {
+            impl Input {
+                pub fn new(#impl_into_args) -> Input {
+                    Input {
+                        #impl_into_fields
+                    }
+                }
+            }
+
+            pub use WrapInput as #fn_ident;
+            #wrap_trait
+
+            #[cfg(not(target_arch = "wasm32"))]
+            struct Here;
+
+            #[cfg(not(target_arch = "wasm32"))]
+            impl <Local, T> WrapInput<Local> for T where
+                T: near_sdk::HasContract<Local, Contract=#marshall_contract>
+            {}
+
+            #[cfg(not(target_arch = "wasm32"))]
+            impl WrapInput<Here> for #marshall_contract {}
         }
     }
 

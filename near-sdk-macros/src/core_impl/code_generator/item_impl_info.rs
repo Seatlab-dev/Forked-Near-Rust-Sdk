@@ -6,12 +6,37 @@ impl ItemImplInfo {
     /// Generate the code that wraps
     pub fn wrapper_code(&self) -> TokenStream2 {
         let mut res = TokenStream2::new();
+        let mut reexports = TokenStream2::new();
         for method in &self.methods {
             if method.is_public || self.is_trait_impl {
                 res.extend(method.method_wrapper());
             }
         }
-        res
+        for reexport in
+            self.methods.iter().filter(|method| method.is_public || self.is_trait_impl).map(
+                |method| {
+                    let ident = &method.attr_signature_info.ident;
+                    quote::quote! {
+                        pub use #ident::#ident;
+                    }
+                },
+            )
+        {
+            reexports.extend(reexport)
+        }
+        let underscore_trait = &self.underscore_trait;
+        let reexports = quote::quote! {
+            #[allow(non_snake_case)]
+            pub mod #underscore_trait {
+                use super::*;
+                #reexports
+            }
+        };
+
+        quote::quote! {
+            #res
+            #reexports
+        }
     }
 
     pub fn marshall_code(&self) -> TokenStream2 {
@@ -29,13 +54,15 @@ impl ItemImplInfo {
             }
         }
         quote! {
-         #[cfg(not(target_arch = "wasm32"))]
-         impl #name {
-           #res
-         }
+            #[cfg(not(target_arch = "wasm32"))]
+            impl #name {
+               #res
+            }
         }
     }
 }
+
+/*
 // Rustfmt removes comas.
 #[rustfmt::skip]
 #[cfg(test)]
@@ -43,7 +70,6 @@ mod tests {
     use syn::{Type, ImplItemMethod, parse_quote};
     use quote::quote;
     use crate::core_impl::info_extractor::ImplItemMethodInfo;
-
 
     #[test]
     fn trait_implt() {
@@ -902,4 +928,7 @@ mod tests {
         );
         assert_eq!(expected.to_string(), actual.to_string());
     }
+
 }
+
+*/

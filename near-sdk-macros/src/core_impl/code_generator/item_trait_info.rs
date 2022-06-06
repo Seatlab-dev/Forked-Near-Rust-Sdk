@@ -20,6 +20,7 @@ impl ItemTraitInfo {
     }
 }
 
+/*
 // Rustfmt removes comas.
 #[rustfmt::skip]
 #[cfg(test)]
@@ -130,3 +131,5 @@ mod tests {
         assert_eq!(actual.to_string(), expected.to_string());
     }
 }
+
+*/

@@ -17,10 +17,13 @@ impl ImplItemMethodInfo {
         let panic_hook = quote! {
             near_sdk::env::setup_panic_hook();
         };
-        let arg_struct;
-        let arg_parsing;
-        if has_input_args {
-            arg_struct = attr_signature_info.input_struct(InputStructType::Deserialization);
+
+        let input_struct = attr_signature_info.input_struct(InputStructType::Deserialization);
+
+        let input_struct2 =
+            attr_signature_info.input_struct2(&self.struct_type, &attr_signature_info.method_type);
+
+        let arg_parsing = if has_input_args {
             let decomposition = attr_signature_info.decomposition_pattern();
             let serializer_invocation = match attr_signature_info.input_serializer {
                 SerializerType::JSON => quote! {
@@ -34,12 +37,11 @@ impl ImplItemMethodInfo {
                     ).expect("Failed to deserialize input from Borsh.")
                 },
             };
-            arg_parsing = quote! {
+            quote! {
                 let #decomposition : Input = #serializer_invocation ;
-            };
+            }
         } else {
-            arg_struct = TokenStream2::new();
-            arg_parsing = TokenStream2::new();
+            TokenStream2::new()
         };
 
         let callback_deser = attr_signature_info.callback_deserialization();
@@ -58,6 +60,28 @@ impl ImplItemMethodInfo {
             is_handles_result,
             ..
         } = attr_signature_info;
+
+        let output_type = match &self.attr_signature_info.returns {
+            ReturnType::Default => quote!(()),
+            ReturnType::Type(_token, type_) => {
+                if matches!(method_type, &MethodType::Init) {
+                    quote!(())
+                } else {
+                    quote!(#type_)
+                }
+            }
+        };
+        let ident_str = ident.to_string();
+        let method = quote! {
+            pub const NAME: &'static str = #ident_str;
+            pub type Output = #output_type;
+            impl near_sdk::utils::Method for Input {
+                const NAME: &'static str = NAME;
+                type Input = Self;
+                type Output = Output;
+            }
+        };
+
         let deposit_check = if *is_payable || matches!(method_type, &MethodType::View) {
             // No check if the method is payable or a view method
             quote! {}
@@ -194,14 +218,22 @@ impl ImplItemMethodInfo {
             #[cfg(target_arch = "wasm32")]
             #[no_mangle]
             pub extern "C" fn #ident() {
+                use #ident::Input;
+
                 #panic_hook
                 #is_private_check
                 #deposit_check
-                #arg_struct
                 #arg_parsing
                 #callback_deser
                 #callback_vec_deser
                 #body
+            }
+            pub mod #ident {
+                use super::*;
+
+                #input_struct
+                #input_struct2
+                #method
             }
         }
     }

@@ -142,6 +142,22 @@ impl PendingContractTx {
     }
 }
 
+pub struct InputWrapped<'this, T, I> {
+    pub inner: &'this T,
+    pub input: I,
+}
+
+pub trait Method {
+    const NAME: &'static str;
+    type Input;
+    type Output;
+}
+
+pub trait HasContract<Local> {
+    type Contract;
+    fn contract(&self) -> &Self::Contract;
+}
+
 /// Deprecated helper function which used to generate code to initialize the [`GlobalAllocator`].
 /// This is now initialized by default. Disable `wee_alloc` feature to configure manually.
 ///
