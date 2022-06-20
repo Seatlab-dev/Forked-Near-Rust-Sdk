@@ -1,6 +1,12 @@
 use borsh::{BorshDeserialize, BorshSchema, BorshSerialize};
 use core::ops;
+use schemars::{
+    gen::SchemaGenerator,
+    schema::{InstanceType, Metadata, NumberValidation, Schema, SchemaObject, StringValidation},
+    JsonSchema,
+};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::json;
 
 /// Represents the amount of NEAR tokens in "gas units" which are used to fund transactions.
 #[derive(
@@ -116,6 +122,51 @@ impl ops::Rem<u64> for Gas {
 
     fn rem(self, rhs: u64) -> Self::Output {
         Self(self.0.rem(rhs))
+    }
+}
+
+impl JsonSchema for Gas {
+    fn is_referenceable() -> bool {
+        true
+    }
+    fn schema_name() -> String {
+        ("Gas").to_owned()
+    }
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        let max = 300_000_000_000_000.;
+        let n_validation = NumberValidation {
+            // maximum value that can be represented that is below u64::MAX,
+            // and below the maximum allowed gas for a function call
+            //
+            // ref: https://docs.near.org/docs/concepts/gas
+            maximum: Some(max),
+            minimum: Some(0.0),
+            ..Default::default()
+        };
+
+        let s_validation = StringValidation {
+            max_length: Some(max.to_string().chars().count() as u32),
+            min_length: Some(u64::MIN.to_string().chars().count() as u32),
+            // 300000000000000
+            pattern: Some(r#"^[0-9]{1,15}$"#.into()),
+        };
+
+        let meta = Metadata {
+            description: Some(r#"Stringfied 64-bit unsigned integer. Represents the amount of NEAR tokens in "gas units" which are used to fund transactions. See [docs/gas](https://docs.near.org/docs/concepts/gas) for more info."#.into()),
+            default: Some(json!(u64::MIN.to_string())),
+            examples: vec![json!(u64::MIN.to_string()), json!(max.to_string())],
+            ..Default::default()
+        };
+
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: None,
+            metadata: Box::new(meta).into(),
+            number: Some(Box::new(n_validation)),
+            string: Some(Box::new(s_validation)),
+            ..Default::default()
+        }
+        .into()
     }
 }
 

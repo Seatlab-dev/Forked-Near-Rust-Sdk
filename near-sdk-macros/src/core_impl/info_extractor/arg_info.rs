@@ -18,6 +18,8 @@ pub enum BindgenArgType {
 pub struct ArgInfo {
     /// Attributes not related to bindgen.
     pub non_bindgen_attrs: Vec<Attribute>,
+    pub doc_attrs: Vec<Attribute>,
+    pub forward_attrs: Vec<Attribute>,
     /// The `binding` part of `ref mut binding @ SUBPATTERN: TYPE` argument.
     pub ident: Ident,
     /// Whether pattern has a preceded `ref`.
@@ -42,6 +44,8 @@ impl ArgInfo {
     /// Extract near-sdk specific argument info.
     pub fn new(original: &mut PatType) -> syn::Result<Self> {
         let mut non_bindgen_attrs = vec![];
+        let mut doc_attrs = vec![];
+        let mut forward_attrs = vec![];
         let pat_reference;
         let pat_mutability;
         let ident;
@@ -85,6 +89,12 @@ impl ArgInfo {
                     let serializer: SerializerAttr = syn::parse2(attr.tokens.clone())?;
                     serializer_ty = serializer.serializer_type;
                 }
+                "doc" => {
+                    doc_attrs.push((*attr).clone());
+                }
+                "schemars" | "serde" => {
+                    forward_attrs.push((*attr).clone());
+                }
                 _ => {
                     non_bindgen_attrs.push((*attr).clone());
                 }
@@ -98,10 +108,15 @@ impl ArgInfo {
                 && attr_str != "serializer"
                 && attr_str != "callback_result"
                 && attr_str != "callback_unwrap"
+                && attr_str != "doc"
+                && attr_str != "schemars"
+                && attr_str != "serde"
         });
 
         Ok(Self {
             non_bindgen_attrs,
+            doc_attrs,
+            forward_attrs,
             ident,
             pat_reference,
             pat_mutability,

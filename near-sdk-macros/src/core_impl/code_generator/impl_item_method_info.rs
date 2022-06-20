@@ -61,6 +61,8 @@ impl ImplItemMethodInfo {
             ..
         } = attr_signature_info;
 
+        let no_args = attr_signature_info.args.is_empty();
+        let no_return = matches!(&self.attr_signature_info.returns, ReturnType::Default);
         let output_type = match &self.attr_signature_info.returns {
             ReturnType::Default => quote!(()),
             ReturnType::Type(_token, type_) => {
@@ -72,11 +74,106 @@ impl ImplItemMethodInfo {
             }
         };
         let ident_str = ident.to_string();
+        let near_method = match attr_signature_info.method_type {
+            MethodType::Regular => quote!(near_sdk::utils::openapi::NearMethod::Regular),
+            MethodType::View => quote!(near_sdk::utils::openapi::NearMethod::View),
+            MethodType::Init => quote!(near_sdk::utils::openapi::NearMethod::Init),
+            MethodType::InitIgnoreState => {
+                quote!(near_sdk::utils::openapi::NearMethod::InitIgnoreState)
+            }
+        };
+
+        let attr_to_string = |attr: &syn::Attribute| {
+            let meta = attr.parse_meta().ok()?;
+            if let syn::Meta::NameValue(syn::MetaNameValue { lit: syn::Lit::Str(s), .. }) = meta {
+                return Some(s.value());
+            }
+
+            None
+        };
+
+        let doc_attrs = attr_signature_info
+            .doc_attrs
+            .iter()
+            .filter_map(attr_to_string)
+            .map(|s| s + "\n")
+            .collect::<String>();
+
+        let mut doc_args_attr = String::new();
+        let mut has_any_parameter_doc = false;
+        for arg in &self.attr_signature_info.args {
+            let attrs = &arg.doc_attrs;
+            if !attrs.is_empty() {
+                has_any_parameter_doc = true;
+            }
+
+            let arg_attr =
+                attrs.iter().filter_map(attr_to_string).map(|s| s + "\n").collect::<String>();
+            doc_args_attr = doc_args_attr
+                + &if arg_attr.is_empty() {
+                    format!("- `{header}`", header = arg.ident)
+                } else {
+                    format!("- `{header}` - {arg_attr}", header = arg.ident, arg_attr = arg_attr)
+                };
+        }
+        let doc_args_attr = if has_any_parameter_doc {
+            format!("\n\n#### Parameters\n\n{}", doc_args_attr)
+        } else {
+            "".into()
+        };
+
+        let mut properties = vec![];
+        match method_type {
+            crate::core_impl::MethodType::Regular => {}
+            crate::core_impl::MethodType::View => {}
+            crate::core_impl::MethodType::Init => {
+                properties.push(("init".to_string(), "✓".to_string()));
+            }
+            crate::core_impl::MethodType::InitIgnoreState => {
+                properties.push(("init".to_string(), "✓ (ignore state)".to_string()));
+            }
+        };
+        if !matches!(method_type, crate::core_impl::MethodType::View) {
+            properties.push((
+                "payable".to_string(),
+                if *is_payable { "✓".to_string() } else { "✕".to_string() },
+            ));
+        }
+
+        if *is_private {
+            properties.push(("private".to_string(), "✓".to_string()));
+        }
+
+        let properties = if properties.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "\n\n#### Properties\n\n| | |\n| -: | :- |\n{}",
+                properties
+                    .into_iter()
+                    .map(|(k, v)| format!("| {} | {} |\n", k, v))
+                    .collect::<String>()
+            )
+        };
+
+        let doc_attrs = format!("{}{}{}", doc_attrs, properties, doc_args_attr);
+        let response_description = format!("{}", &output_type);
+
         let method = quote! {
             pub const NAME: &'static str = #ident_str;
+            pub const NEAR_METHOD: near_sdk::utils::openapi::NearMethod = #near_method;
+            const DESCRIPTION: &'static str = #doc_attrs;
+            const RESPONSE_DESCRIPTION: &'static str = #response_description;
+            const NO_ARGS: bool = #no_args;
+            const NO_RETURN: bool = #no_return;
             pub type Output = #output_type;
             impl near_sdk::utils::Method for Input {
                 const NAME: &'static str = NAME;
+                const NEAR_METHOD: near_sdk::utils::openapi::NearMethod = NEAR_METHOD;
+                const DESCRIPTION: &'static str = DESCRIPTION;
+                const RESPONSE_DESCRIPTION: &'static str = RESPONSE_DESCRIPTION;
+                const NO_ARGS: bool = NO_ARGS;
+                const NO_RETURN: bool = NO_RETURN;
                 type Input = Self;
                 type Output = Output;
             }

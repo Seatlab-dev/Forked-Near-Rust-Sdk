@@ -1,5 +1,11 @@
 use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
 use bs58::decode::Error as B58Error;
+use schemars::{
+    gen::SchemaGenerator,
+    schema::{InstanceType, Metadata, Schema, SchemaObject, StringValidation},
+    JsonSchema,
+};
+use serde_json::json;
 use std::convert::TryFrom;
 
 /// PublicKey curve
@@ -181,6 +187,73 @@ impl std::str::FromStr for PublicKey {
         Self::from_parts(curve, data)
     }
 }
+
+impl JsonSchema for PublicKey {
+    fn is_referenceable() -> bool {
+        true
+    }
+    fn schema_name() -> String {
+        ("PublicKey").to_owned()
+    }
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        // ref: https://nomicon.io/DataStructures/Account
+        let s_validation = StringValidation {
+            min_length: Some(2),
+            max_length: Some(64),
+            // ed25519 min
+            // = 1 + 32 bytes
+            // = 0x000000000000000000000000000000000000000000000000000000000000000000
+            // ^ this in base58 is 111111111111111111111111111111111
+            // which is 33 chars in length
+            //
+            // ed25519 max
+            // = 1 + 32 bytes
+            // = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+            // ^ this in base58 is 2K3n5t4wSaF5mj27Tw9vStXWLWyRjjiH5Cp3CFLpKVCr1c
+            // which is 46 chars in length
+            //
+            //
+            // secp256k1 min
+            // = 1 + 64 bytes
+            // which when zeroed, is in base58:
+            // 11111111111111111111111111111111111111111111111111111111111111111
+            // which is 65 chars in length
+            //
+            // secp256k1 max
+            // = 1 + 64 bytes
+            // which when full of 0xff, is in base58:
+            // PbGvaomYRfb7uHHdgYrHrM2HMLhjLftSPTPiKpZnXVnaXWyAn4HxUWeMm3wbfQZ2BFkN3q7HqdxMLECGdmX1jgorv
+            // which is 89 chars in length
+            pattern: Some(
+                r#"^((secp256k1:[1-9A-Za-z][^OIl]{65,89})|(ed25519:)?[1-9A-Za-z][^OIl]{33,46})$"#
+                    .into(),
+            ),
+        };
+
+        let meta = Metadata {
+            // title: Some("Public Key".into()),
+            description: Some("Public key in a binary format with base58 string serialization with human-readable curve. See [docs/implicit-accounts](https://docs.near.org/docs/roles/integrator/implicit-accounts) for more info.".into()),
+            default: None,
+            // ref: https://nomicon.io/DataStructures/Account
+            examples: vec![
+                json!("ed25519:6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp"), 
+                json!("6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp"), 
+                json!("secp256k1:qMoRgcoXai4mBPsdbHi1wfyxF9TdbPCF4qSDQTRP3TfescSRoUdSx6nmeQoN3aiwGzwMyGXAb1gUjBTv5AY8DXj")
+            ],
+            ..Default::default()
+        };
+
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: None,
+            metadata: Box::new(meta).into(),
+            string: Some(Box::new(s_validation)),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
 #[derive(Debug)]
 pub struct ParsePublicKeyError {
     kind: ParsePublicKeyErrorKind,

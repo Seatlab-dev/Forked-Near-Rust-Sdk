@@ -1,7 +1,13 @@
 use crate::CryptoHash;
 use borsh::{BorshDeserialize, BorshSerialize};
 use bs58::decode::Error as B58Error;
+use schemars::{
+    gen::SchemaGenerator,
+    schema::{InstanceType, Metadata, NumberValidation, Schema, SchemaObject, StringValidation},
+    JsonSchema,
+};
 use serde::{de, ser, Deserialize};
+use serde_json::json;
 use std::convert::TryFrom;
 
 #[derive(
@@ -74,6 +80,51 @@ impl std::str::FromStr for Base58CryptoHash {
             });
         }
         Ok(Self(crypto_hash))
+    }
+}
+
+impl JsonSchema for Base58CryptoHash {
+    fn is_referenceable() -> bool {
+        true
+    }
+    fn schema_name() -> String {
+        ("Base58CryptoHash").to_owned()
+    }
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        // in base58 = "11111111111111111111111111111111"
+        let min = Base58CryptoHash([0; 32]);
+        // in base58 = "JEKNVnkbo3jma5nREBBJCDoXFVeKkD56V3xKrvRmWxFG"
+        let max = Base58CryptoHash([0xff; 32]);
+
+        let n_validation = NumberValidation {
+            // maximum value that can be represented that is below u256::MAX
+            maximum: Some(1.157920892373161e77f64),
+            minimum: Some(0.0),
+            ..Default::default()
+        };
+
+        let s_validation = StringValidation {
+            max_length: Some(String::from(&max).chars().count() as u32),
+            min_length: Some(String::from(&min).chars().count() as u32),
+            pattern: Some(r#"^[1-9A-Za-z][^OIl]{32,44}^"#.into()),
+        };
+
+        let meta = Metadata {
+            description: Some("Base58-stringfied 256-bit unsigned integer.".into()),
+            default: Some(json!(String::from(&min))),
+            examples: vec![json!(String::from(&min)), json!(String::from(&max))],
+            ..Default::default()
+        };
+
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: None,
+            metadata: Box::new(meta).into(),
+            number: Some(Box::new(n_validation)),
+            string: Some(Box::new(s_validation)),
+            ..Default::default()
+        }
+        .into()
     }
 }
 

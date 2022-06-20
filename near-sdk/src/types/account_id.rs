@@ -1,5 +1,11 @@
 use borsh::{maybestd::io, BorshDeserialize, BorshSchema, BorshSerialize};
+use schemars::{
+    gen::SchemaGenerator,
+    schema::{InstanceType, Metadata, Schema, SchemaObject, StringValidation},
+    JsonSchema,
+};
 use serde::{de, Deserialize, Serialize};
+use serde_json::json;
 use std::convert::TryFrom;
 use std::fmt;
 
@@ -115,6 +121,46 @@ impl std::str::FromStr for AccountId {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         validate_account_id(value)?;
         Ok(Self(value.to_string()))
+    }
+}
+
+impl JsonSchema for AccountId {
+    fn is_referenceable() -> bool {
+        true
+    }
+    fn schema_name() -> String {
+        ("AccountId").to_owned()
+    }
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        // ref: https://nomicon.io/DataStructures/Account
+        let s_validation = StringValidation {
+            min_length: Some(2),
+            max_length: Some(64),
+            pattern: Some(r#"^(([a-z\d]+[\-_])*[a-z\d]+\.)*([a-z\d]+[\-_])*[a-z\d]+$"#.into()),
+        };
+
+        let meta = Metadata {
+            // title: Some("Account identifier".into()),
+            description: Some("This is the human readable utf8 string which is used internally to index accounts on the network and their respective state. See [nomicon/Account](https://nomicon.io/DataStructures/Account) for more info.".into()),
+            default: Some(json!("alice.near")),
+            // ref: https://nomicon.io/DataStructures/Account
+            examples: vec![
+                json!("alice.near"), 
+                json!("bob.testnet"), 
+                json!("toplevel"), 
+                json!("some-example.top-level"), 
+                json!("98793cd91a3f870fb126f66285808c7e094afcfc4eda8a970f6648cdf0dbd6de")],
+            ..Default::default()
+        };
+
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: None,
+            metadata: Box::new(meta).into(),
+            string: Some(Box::new(s_validation)),
+            ..Default::default()
+        }
+        .into()
     }
 }
 

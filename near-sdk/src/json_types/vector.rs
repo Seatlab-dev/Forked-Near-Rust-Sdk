@@ -1,5 +1,11 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use schemars::{
+    gen::SchemaGenerator,
+    schema::{InstanceType, Metadata, Schema, SchemaObject, StringValidation},
+    JsonSchema,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::json;
 
 /// Helper class to serialize/deserialize `Vec<u8>` to base64 string.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BorshDeserialize, BorshSerialize)]
@@ -47,6 +53,41 @@ mod base64_bytes {
     {
         let s: String = Deserialize::deserialize(deserializer)?;
         base64::decode(s.as_str()).map_err(de::Error::custom)
+    }
+}
+
+impl JsonSchema for Base64VecU8 {
+    fn is_referenceable() -> bool {
+        true
+    }
+    fn schema_name() -> String {
+        ("Base64VecU8").to_owned()
+    }
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        let s_validation = StringValidation {
+            min_length: Some(0),
+            max_length: None,
+            // ref: https://regexland.com/base64/
+            pattern: Some(
+                r#"^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{3}=|[A-Za-z\d+/]{2}==)?$"#.into(),
+            ),
+        };
+
+        let meta = Metadata {
+            description: Some("Base64-stringfied byte array.".into()),
+            default: Some(json!("")),
+            examples: vec![json!(""), json!("ZHkfFAAXIA==")],
+            ..Default::default()
+        };
+
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: None,
+            metadata: Box::new(meta).into(),
+            string: Some(Box::new(s_validation)),
+            ..Default::default()
+        }
+        .into()
     }
 }
 

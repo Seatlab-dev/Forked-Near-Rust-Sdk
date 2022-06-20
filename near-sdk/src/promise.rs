@@ -1,4 +1,9 @@
 use borsh::BorshSchema;
+use schemars::{
+    gen::SchemaGenerator,
+    schema::{Metadata, Schema, SchemaObject},
+    JsonSchema,
+};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{Error, Write};
@@ -437,6 +442,32 @@ impl borsh::BorshSerialize for Promise {
     }
 }
 
+impl JsonSchema for Promise {
+    fn is_referenceable() -> bool {
+        true
+    }
+    fn schema_name() -> String {
+        ("Promise").to_owned()
+    }
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        let meta = Metadata {
+            // title: Some("Execution result".into()),
+            description: Some("Result of the scheduled execution on some contract. This has multiple uses: (1) Can indicate that a (potentially arbitrary) result from a call to a (potentially arbitrary) contract will be returned. (2) Can indicate that multiple actions are happening in a single transaction. See [nomicon/FunctionCall](https://nomicon.io/RuntimeSpec/FunctionCall) and [nomicon/Actions](https://nomicon.io/RuntimeSpec/Actions) for more info.".into()),
+            default: None,
+            examples: vec![],
+            ..Default::default()
+        };
+
+        SchemaObject {
+            // instance_type: Some(InstanceType::String.into()),
+            format: None,
+            metadata: Box::new(meta).into(),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
 /// When the method can return either a promise or a value, it can be called with `PromiseOrValue::Promise`
 /// or `PromiseOrValue::Value` to specify which one should be returned.
 /// # Example
@@ -454,8 +485,11 @@ impl borsh::BorshSerialize for Promise {
 ///     contract_a::a("bob_near".parse().unwrap(), 0, Gas(1_000)).into()
 /// };
 /// ```
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
+#[schemars(
+    description = "The result of the scheduled execution on some contract. This can either be a value of some concrete type, or the more general Promise result. It's often the case that if the call returns immediately then a concrete value is returned, and otherwise if an external call needs to happen then a Promise is returned."
+)]
 pub enum PromiseOrValue<T> {
     Promise(Promise),
     Value(T),

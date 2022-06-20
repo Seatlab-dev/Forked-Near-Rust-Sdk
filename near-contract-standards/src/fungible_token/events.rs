@@ -15,12 +15,14 @@
 
 use crate::event::NearEvent;
 use near_sdk::json_types::U128;
+use near_sdk::schemars::JsonSchema;
 use near_sdk::AccountId;
 use serde::Serialize;
 
 /// Data to log for an FT mint event. To log this event, call [`.emit()`](FtMint::emit).
 #[must_use]
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, JsonSchema)]
+#[schemars(crate = "near_sdk::schemars")]
 pub struct FtMint<'a> {
     pub owner_id: &'a AccountId,
     pub amount: &'a U128,
@@ -45,7 +47,8 @@ impl FtMint<'_> {
 /// Data to log for an FT transfer event. To log this event,
 /// call [`.emit()`](FtTransfer::emit).
 #[must_use]
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, JsonSchema)]
+#[schemars(crate = "near_sdk::schemars")]
 pub struct FtTransfer<'a> {
     pub old_owner_id: &'a AccountId,
     pub new_owner_id: &'a AccountId,
@@ -70,7 +73,8 @@ impl FtTransfer<'_> {
 
 /// Data to log for an FT burn event. To log this event, call [`.emit()`](FtBurn::emit).
 #[must_use]
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, JsonSchema)]
+#[schemars(crate = "near_sdk::schemars")]
 pub struct FtBurn<'a> {
     pub owner_id: &'a AccountId,
     pub amount: &'a U128,
@@ -92,17 +96,19 @@ impl FtBurn<'_> {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, JsonSchema)]
+#[schemars(crate = "near_sdk::schemars")]
 pub(crate) struct Nep141Event<'a> {
     version: &'static str,
     #[serde(flatten)]
     event_kind: Nep141EventKind<'a>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, JsonSchema)]
 #[serde(tag = "event", content = "data")]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::enum_variant_names)]
+#[schemars(crate = "near_sdk::schemars")]
 enum Nep141EventKind<'a> {
     FtMint(&'a [FtMint<'a>]),
     FtTransfer(&'a [FtTransfer<'a>]),

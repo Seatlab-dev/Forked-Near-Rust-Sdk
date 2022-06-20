@@ -1,4 +1,5 @@
 use crate::non_fungible_token::metadata::TokenMetadata;
+use near_sdk::schemars::JsonSchema;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::AccountId;
 use std::collections::HashMap;
@@ -7,8 +8,9 @@ use std::collections::HashMap;
 pub type TokenId = String;
 
 /// In this implementation, the Token struct takes two extensions standards (metadata and approval) as optional fields, as they are frequently used in modern NFTs.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(crate = "near_sdk::serde")]
+#[schemars(crate = "near_sdk::schemars")]
 pub struct Token {
     pub token_id: TokenId,
     pub owner_id: AccountId,

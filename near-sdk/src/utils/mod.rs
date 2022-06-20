@@ -2,6 +2,8 @@
 
 pub(crate) mod storage_key_impl;
 
+pub mod openapi;
+
 #[cfg(feature = "unstable")]
 mod stable_map;
 #[cfg(feature = "unstable")]
@@ -142,17 +144,53 @@ impl PendingContractTx {
     }
 }
 
+/// Wrapper for any type (`inner`) that has an `Input` (`I`) as a sibling field.
+///
+/// This is useful for methods that require access to the `Input` (`I`) and some
+/// other arbitrary type.
 pub struct InputWrapped<'this, T, I> {
     pub inner: &'this T,
     pub input: I,
 }
 
+/// Information related to a method.
 pub trait Method {
+    /// Method name.
     const NAME: &'static str;
+    /// View/Call/etc properties for the method.
+    const NEAR_METHOD: crate::utils::openapi::NearMethod;
+    /// Method description.
+    const DESCRIPTION: &'static str;
+    /// Type description for the response.
+    const RESPONSE_DESCRIPTION: &'static str;
+    /// Whether this method requires no inputs.
+    const NO_ARGS: bool;
+    /// Whether this method haven't defined any return.
+    const NO_RETURN: bool;
+    /// Input type for this method (`Input` struct).
     type Input;
+    /// Output type for this method (`Output` type alias).
     type Output;
 }
 
+/// Enables the creation of the "MyContractContract" wrapper given an `account_id`.  
+/// This can help in writing tests.
+///
+/// The usual implementation on the contract code is as follows:
+///
+/// ```ignore
+/// #[cfg(not(target_arch = "wasm32"))]
+/// impl common::non_wasm::WithAccount for MyContractContract {
+///     fn with_account(account_id: AccountId) -> Self {
+///         Self { account_id }
+///     }
+/// }
+/// ```
+pub trait WithAccount {
+    fn with_account(account_id: AccountId) -> Self;
+}
+
+/// A trait used to indicate that some type has an access to a contract instance.
 pub trait HasContract<Local> {
     type Contract;
     fn contract(&self) -> &Self::Contract;

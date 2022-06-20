@@ -29,6 +29,7 @@ impl AttrSigInfo {
         //     !args.is_empty(),
         //     "Can only generate input struct for when input args are specified"
         // );
+        let schemars_renamed = format!("{}.Input", self.ident);
         let attribute = match input_struct_type {
             InputStructType::Serialization => match &self.input_serializer {
                 SerializerType::JSON => quote! {
@@ -43,12 +44,20 @@ impl AttrSigInfo {
             },
             InputStructType::Deserialization => match &self.input_serializer {
                 SerializerType::JSON => quote! {
-                    #[derive(near_sdk::serde::Serialize, near_sdk::serde::Deserialize)]
+                    #[derive(
+                        near_sdk::serde::Serialize,
+                        near_sdk::serde::Deserialize,
+                        near_sdk::schemars::JsonSchema
+                    )]
                     #[serde(crate = "near_sdk::serde")]
+                    #[schemars(crate = "near_sdk::schemars")]
+                    #[schemars(rename = #schemars_renamed)]
                 },
                 SerializerType::Borsh => {
                     quote! {
-                        #[derive(near_sdk::borsh::BorshSerialize, near_sdk::borsh::BorshDeserialize)]
+                        #[derive(
+                            near_sdk::borsh::BorshSerialize, near_sdk::borsh::BorshDeserialize
+                        )]
                     }
                 }
             },
@@ -56,13 +65,81 @@ impl AttrSigInfo {
         // pub a: (), pub b: (), ..
         let mut fields = TokenStream2::new();
         for arg in args {
-            let ArgInfo { ty, ident, .. } = &arg;
+            let ArgInfo { ty, ident, doc_attrs, forward_attrs: schemars_attrs, .. } = &arg;
             fields.extend(quote! {
+                #(#doc_attrs)*
+                #(#schemars_attrs)*
                 pub #ident: #ty,
             });
         }
+        let doc_attrs = &self.doc_attrs;
+        let schemars_attrs = &self.forward_attrs;
+        let mut doc_args_attr = vec![];
+        let mut has_any_parameter_doc = false;
+        for arg in &self.args {
+            let header = format!("- `{}`", arg.ident);
+            let attrs = &arg.doc_attrs;
+            if !attrs.is_empty() {
+                has_any_parameter_doc = true;
+            }
+            doc_args_attr.push(quote! {
+                #[doc = #header]
+                #(#attrs)*
+            });
+        }
+        let parameters_doc = if has_any_parameter_doc {
+            quote! {
+                #[doc = ""]
+                #[doc = "#### Parameters"]
+                #[doc = ""]
+                #(#doc_args_attr)*
+            }
+        } else {
+            quote!()
+        };
+
+        let mut properties = vec![];
+        match self.method_type {
+            crate::core_impl::MethodType::Regular => {}
+            crate::core_impl::MethodType::View => {}
+            crate::core_impl::MethodType::Init => {
+                properties.push(("init".to_string(), "✓".to_string()));
+            }
+            crate::core_impl::MethodType::InitIgnoreState => {
+                properties.push(("init".to_string(), "✓ (ignore state)".to_string()));
+            }
+        };
+        if !matches!(self.method_type, crate::core_impl::MethodType::View) {
+            properties.push((
+                "payable".to_string(),
+                if self.is_payable { "✓".to_string() } else { "✕".to_string() },
+            ));
+        }
+
+        if self.is_private {
+            properties.push(("private".to_string(), "✓".to_string()));
+        }
+
+        let properties =
+            properties.into_iter().map(|(k, v)| format!("- {}: {}", k, v)).collect::<Vec<_>>();
+
+        let properties = if properties.is_empty() {
+            quote!()
+        } else {
+            quote! {
+                #[doc = ""]
+                #[doc = "#### Properties"]
+                #[doc = ""]
+                #(#[doc = #properties])*
+            }
+        };
+
         quote! {
             #attribute
+            #(#doc_attrs)*
+            #(#schemars_attrs)*
+            #parameters_doc
+            #properties
             pub struct Input {
                 #fields
             }

@@ -70,3 +70,9 @@ pub use serde;
 
 #[doc(hidden)]
 pub use serde_json;
+
+#[doc(hidden)]
+pub use okapi;
+
+#[doc(hidden)]
+pub use schemars;

@@ -10,6 +10,8 @@ pub struct AttrSigInfo {
     pub ident: Ident,
     /// Attributes not related to bindgen.
     pub non_bindgen_attrs: Vec<Attribute>,
+    pub doc_attrs: Vec<Attribute>,
+    pub forward_attrs: Vec<Attribute>,
     /// All arguments of the method.
     pub args: Vec<ArgInfo>,
     /// Describes the type of the method.
@@ -59,6 +61,8 @@ impl AttrSigInfo {
 
         let ident = original_sig.ident.clone();
         let mut non_bindgen_attrs = vec![];
+        let mut doc_attrs = vec![];
+        let mut forward_attrs = vec![];
         let mut args = vec![];
         let mut method_type = MethodType::Regular;
         let mut is_payable = false;
@@ -92,6 +96,13 @@ impl AttrSigInfo {
                 }
                 "handle_result" => {
                     is_handles_result = true;
+                }
+                "doc" => {
+                    doc_attrs.push((*attr).clone());
+                    non_bindgen_attrs.push((*attr).clone());
+                }
+                "schemars" | "serde" => {
+                    forward_attrs.push((*attr).clone());
                 }
                 _ => {
                     non_bindgen_attrs.push((*attr).clone());
@@ -137,6 +148,8 @@ impl AttrSigInfo {
         let mut result = Self {
             ident,
             non_bindgen_attrs,
+            doc_attrs,
+            forward_attrs,
             args,
             input_serializer: SerializerType::JSON,
             method_type,

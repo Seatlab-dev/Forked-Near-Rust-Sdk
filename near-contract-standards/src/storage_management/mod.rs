@@ -1,19 +1,47 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
+use near_sdk::schemars::JsonSchema;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::AccountId;
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+/// The balance status.
+///
+/// See [NEP-145](https://nomicon.io/Standards/StorageManagement) for more info.
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, JsonSchema)]
 #[serde(crate = "near_sdk::serde")]
+#[schemars(crate = "near_sdk::schemars")]
 pub struct StorageBalance {
+    /// The total amount of yoctoNEAR that the user has deposited for him.
     pub total: U128,
+    /// The amount of yoctoNEAR that the user has deposited but is not being used by
+    /// the contract, and which the user is free to withdraw.
     pub available: U128,
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+/// The minimum and maximum balance amounts that the contract may require from the
+/// user.
+///
+/// See [NEP-145](https://nomicon.io/Standards/StorageManagement) for more info.
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, JsonSchema)]
 #[serde(crate = "near_sdk::serde")]
+#[schemars(crate = "near_sdk::schemars")]
 pub struct StorageBalanceBounds {
+    /// The amount of yoctoNEAR that is required by some functionality, such as for
+    /// registering a user on a contract.
+    ///
+    /// If a new user attaches `min` NEAR to a `storage_deposit` call, subsequent
+    /// calls to `storage_balance_of` for this user must show their `total` equal to
+    /// `min`, and `available=0`.
     pub min: U128,
+    /// The maximum amount of yoctoNEAR that the contract may require from the user.
+    ///
+    /// - If `null`, then there's no specific maximum balance amount that the
+    /// contract may require from the user.  
+    /// - If `max` enquals `min`, then the contract only charges for initial
+    /// registration, and does not adjust per-user storage over time.  
+    /// - Otherwise for some `max` amount, if the user has tried to deposit some
+    /// amount higher than `max`, then the contract refunds that extra amount back
+    /// to the user.
     pub max: Option<U128>,
 }
 
