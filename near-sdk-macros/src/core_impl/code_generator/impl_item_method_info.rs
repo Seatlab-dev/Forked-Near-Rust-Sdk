@@ -1,5 +1,5 @@
 use crate::core_impl::info_extractor::{
-    AttrSigInfo, ImplItemMethodInfo, InputStructType, MethodType, SerializerType,
+    AttrSigInfo, ImplItemMethodInfo, InputStructType, MethodType, PropertyAttr, SerializerType,
 };
 use crate::core_impl::utils;
 use proc_macro2::TokenStream as TokenStream2;
@@ -49,6 +49,7 @@ impl ImplItemMethodInfo {
 
         let arg_list = attr_signature_info.arg_list();
         let AttrSigInfo {
+            property_attrs,
             non_bindgen_attrs,
             ident,
             receiver,
@@ -142,6 +143,10 @@ impl ImplItemMethodInfo {
 
         if *is_private {
             properties.push(("private".to_string(), "✓".to_string()));
+        }
+
+        for property in property_attrs.iter().map(PropertyAttr::to_key_value) {
+            properties.push(property)
         }
 
         let properties = if properties.is_empty() {

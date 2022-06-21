@@ -1,6 +1,9 @@
 mod serializer_attr;
 pub use serializer_attr::SerializerAttr;
 
+mod property_attr;
+pub use property_attr::PropertyAttr;
+
 mod arg_info;
 pub use arg_info::{ArgInfo, BindgenArgType};
 

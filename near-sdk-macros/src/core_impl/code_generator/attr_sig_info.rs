@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream as TokenStream2;
 
 use crate::core_impl::info_extractor::{
-    ArgInfo, AttrSigInfo, BindgenArgType, InputStructType, SerializerType,
+    ArgInfo, AttrSigInfo, BindgenArgType, InputStructType, PropertyAttr, SerializerType,
 };
 use crate::core_impl::utils;
 use quote::quote;
@@ -118,6 +118,10 @@ impl AttrSigInfo {
 
         if self.is_private {
             properties.push(("private".to_string(), "✓".to_string()));
+        }
+
+        for property in self.property_attrs.iter().map(PropertyAttr::to_key_value) {
+            properties.push(property)
         }
 
         let properties =

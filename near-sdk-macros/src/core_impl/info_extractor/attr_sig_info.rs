@@ -1,3 +1,4 @@
+use super::property_attr::PropertyAttr;
 use super::{ArgInfo, BindgenArgType, InitAttr, MethodType, SerializerAttr, SerializerType};
 use proc_macro2::Span;
 use quote::ToTokens;
@@ -11,6 +12,7 @@ pub struct AttrSigInfo {
     /// Attributes not related to bindgen.
     pub non_bindgen_attrs: Vec<Attribute>,
     pub doc_attrs: Vec<Attribute>,
+    pub property_attrs: Vec<PropertyAttr>,
     pub forward_attrs: Vec<Attribute>,
     /// All arguments of the method.
     pub args: Vec<ArgInfo>,
@@ -72,6 +74,7 @@ impl AttrSigInfo {
         let mut result_serializer = SerializerType::JSON;
 
         let mut payable_attr = None;
+        let mut property_attrs = vec![];
         for attr in original_attrs.iter() {
             let attr_str = attr.path.to_token_stream().to_string();
             match attr_str.as_str() {
@@ -103,6 +106,10 @@ impl AttrSigInfo {
                 }
                 "schemars" | "serde" => {
                     forward_attrs.push((*attr).clone());
+                }
+                "property" => {
+                    let property: PropertyAttr = syn::parse2(attr.tokens.clone())?;
+                    property_attrs.push(property);
                 }
                 _ => {
                     non_bindgen_attrs.push((*attr).clone());
@@ -149,6 +156,7 @@ impl AttrSigInfo {
             ident,
             non_bindgen_attrs,
             doc_attrs,
+            property_attrs,
             forward_attrs,
             args,
             input_serializer: SerializerType::JSON,
