@@ -67,18 +67,12 @@ macro_rules! log {
 #[macro_export]
 macro_rules! require {
     ($cond:expr $(,)?) => {
-        if cfg!(debug_assertions) {
-            assert!($cond)
-        } else if !$cond {
+        if !$cond {
             $crate::env::panic_str("require! assertion failed");
         }
     };
     ($cond:expr, $message:expr $(,)?) => {
-        if cfg!(debug_assertions) {
-            // Error message must be &str to match panic_str signature
-            let msg: &str = &$message;
-            assert!($cond, "{}", msg)
-        } else if !$cond {
+        if !$cond {
             $crate::env::panic_str(&$message)
         }
     };
