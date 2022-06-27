@@ -16,8 +16,8 @@ exclude = ["examples/"]
 
 [patch.crates-io.schemars]
 git = "https://github.com/Seatlab-dev/schemars.git"
-rev = "df322feb675a194b62ddd449deb6c731417052b6"
+rev = "57ffb49"
 
 [patch.crates-io.okapi]
 git = "https://github.com/Seatlab-dev/okapi.git"
-rev = "b681ab0a14d7e3c40a16c93dddb184ac3c70c3a4"
+rev = "8d842d7"
